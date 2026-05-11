@@ -1,0 +1,9 @@
+{
+  "name": "KrishiSahay AI",
+  "description": "A modern AI-powered agriculture assistant providing crop recommendations, weather insights, and pest detection advice for farmers.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
