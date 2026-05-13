@@ -4,9 +4,11 @@ import { Sprout, Search, Sparkles, Loader2, Info, CheckCircle2 } from 'lucide-re
 import { getCropRecommendation } from '@/services/gemini';
 import Markdown from 'react-markdown';
 import { useApp } from '@/context/AppContext';
+import { getTranslation } from '@/constants/translations';
 
 export default function CropRecommendations() {
   const { addCrop, settings } = useApp();
+  const t = getTranslation(settings.language);
   const [formData, setFormData] = useState({
     soilType: 'Loamy',
     season: 'Kharif',
@@ -30,8 +32,8 @@ export default function CropRecommendations() {
     <div className="max-w-5xl mx-auto space-y-8 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6 mb-8">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Crop Optimization System</h1>
-          <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-[0.2em] mt-1">AI-Driven Agricultural Planning</p>
+          <h1 className="text-xl font-bold tracking-tight">{t.cropOptimization}</h1>
+          <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-[0.2em] mt-1">{t.aiPlanning}</p>
         </div>
       </div>
 
@@ -40,39 +42,39 @@ export default function CropRecommendations() {
           <form onSubmit={handleSubmit} className="card space-y-6 sticky top-8 border border-slate-200 shadow-sm bg-white">
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Soil Architecture</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t.soilArchitecture}</label>
                 <select 
                   value={formData.soilType}
                   onChange={(e) => setFormData({...formData, soilType: e.target.value})}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all font-medium"
                 >
-                  <option>Loamy</option>
-                  <option>Sandy</option>
-                  <option>Clayey</option>
-                  <option>Black Soil</option>
-                  <option>Red Soil</option>
-                  <option>Laterite Soil</option>
-                  <option>Alluvial</option>
+                  <option value="Loamy">{t.soilTypes.Loamy}</option>
+                  <option value="Sandy">{t.soilTypes.Sandy}</option>
+                  <option value="Clayey">{t.soilTypes.Clayey}</option>
+                  <option value="Black Soil">{t.soilTypes.Black}</option>
+                  <option value="Red Soil">{t.soilTypes.Red}</option>
+                  <option value="Laterite Soil">{t.soilTypes.Laterite}</option>
+                  <option value="Alluvial">{t.soilTypes.Alluvial}</option>
                 </select>
               </div>
               
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Current Cycle / Season</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t.season}</label>
                 <select 
                   value={formData.season}
                   onChange={(e) => setFormData({...formData, season: e.target.value})}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-xs outline-hidden focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 transition-all font-medium"
                 >
-                  <option>Kharif (Monsoon)</option>
-                  <option>Rabi (Winter)</option>
-                  <option>Zaid (Summer)</option>
-                  <option>Perennial</option>
+                  <option value="Kharif">{t.seasons.Kharif}</option>
+                  <option value="Rabi">{t.seasons.Rabi}</option>
+                  <option value="Zaid">{t.seasons.Zaid}</option>
+                  <option value="Perennial">{t.seasons.Perennial}</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Avg Temp (°C)</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t.temp}</label>
                   <input 
                     required
                     type="number"
@@ -83,7 +85,7 @@ export default function CropRecommendations() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Rainfall (mm)</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t.rainfall}</label>
                   <input 
                     required
                     type="number"
@@ -96,7 +98,7 @@ export default function CropRecommendations() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">State / Sector Location</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t.location}</label>
                 <input 
                   required
                   placeholder="e.g. Maharashtra, India"
@@ -115,7 +117,7 @@ export default function CropRecommendations() {
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                 <>
                   <Sparkles className="w-4 h-4 group-hover:scale-110 transition-transform text-emerald-400" />
-                  Generate Protocol
+                  {t.generate}
                 </>
               )}
             </button>

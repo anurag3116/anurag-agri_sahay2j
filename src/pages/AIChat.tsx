@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, User, Bot, Loader2, Sparkles, Droplets, ShieldAlert, Sprout, ThermometerSun, Leaf, CalendarIcon, Mic, MicOff, Volume2, X } from 'lucide-react';
-import { getFarmingAdvice, getSpecializedAdvice, getFarmingVoiceAdvice, textToSpeech } from '@/services/gemini';
+import { getFarmingAdvice, getSpecializedAdvice, getFarmingVoiceAdvice, getFarmingNexusStream, textToSpeech, streamTextToSpeech } from '@/services/gemini';
 import Markdown from 'react-markdown';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -50,96 +50,167 @@ export default function AIChat() {
 
     // If already playing or generating this one, stop it
     if (isPlayingAudio === index || isGeneratingAudio === index) {
-      if (currentSourceRef.current) {
-        try { currentSourceRef.current.stop(); } catch (e) {}
-        currentSourceRef.current = null;
-      }
+      stopCurrentPlayback();
       setIsPlayingAudio(null);
       setIsGeneratingAudio(null);
       return;
     }
 
     // Stop any current playback
+    stopCurrentPlayback();
+
+    const audioCtx = audioCtxRef.current;
+    if (!audioCtx) return;
+
+    let cachedBase64 = audioCache[index];
+    
+    if (cachedBase64) {
+      // Direct playback from cache
+      playFromBase64(cachedBase64, index);
+      return;
+    }
+
+    // Start streaming
+    setIsGeneratingAudio(index);
+    setIsPlayingAudio(index);
+    let allChunks: Uint8Array[] = [];
+    let nextStartTime = audioCtx.currentTime + 0.1;
+
+    try {
+      const stream = streamTextToSpeech(text);
+      let isFirstChunk = true;
+
+      for await (const chunk of stream) {
+        // Check if user switched or stopped
+        if (isPlayingAudio !== index && isGeneratingAudio !== index) break;
+        
+        if (isFirstChunk) {
+          setIsGeneratingAudio(null);
+          isFirstChunk = false;
+        }
+
+        const binaryString = atob(chunk);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        allChunks.push(bytes);
+
+        const buffer = await decodeAudioChunk(chunk, audioCtx);
+        if (buffer) {
+          playBufferChunk(buffer, nextStartTime, index);
+          nextStartTime += buffer.duration;
+        }
+      }
+
+      if (allChunks.length > 0) {
+        // Build the full binary
+        const totalLen = allChunks.reduce((acc, curr) => acc + curr.length, 0);
+        const fullBytes = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const chunk of allChunks) {
+          fullBytes.set(chunk, offset);
+          offset += chunk.length;
+        }
+        
+        // Fast binary to base64
+        let binary = '';
+        for (let i = 0; i < fullBytes.length; i++) {
+          binary += String.fromCharCode(fullBytes[i]);
+        }
+        const fullBase64 = btoa(binary);
+        setAudioCache(prev => ({ ...prev, [index]: fullBase64 }));
+      }
+    } catch (err) {
+      console.error("Streaming TTS Error:", err);
+    } finally {
+      setIsGeneratingAudio(null);
+      // Optional: keep isPlayingAudio until last chunk finishes
+      // For now, clearing it here is safe enough as the loop ended
+      setIsPlayingAudio(null);
+    }
+  };
+
+  const stopCurrentPlayback = () => {
     if (currentSourceRef.current) {
       try { currentSourceRef.current.stop(); } catch (e) {}
       currentSourceRef.current = null;
     }
+    // We might have multiple scheduled nodes, but they will end naturally or be stopped if we track them.
+    // For simplicity, we just clear the reference used for the UI state.
+    setIsPlayingAudio(null);
+  };
 
-    let base64Audio = audioCache[index];
-    
-    if (!base64Audio) {
-      setIsGeneratingAudio(index);
-      try {
-        base64Audio = await textToSpeech(text);
-        if (base64Audio) {
-          setAudioCache(prev => ({ ...prev, [index]: base64Audio }));
-        }
-      } catch (err) {
-        console.error("TTS Fetch Error:", err);
-      } finally {
-        setIsGeneratingAudio(null);
-      }
-    }
-
-    // If user cancelled or started another one during synthesis
-    if (!base64Audio) return;
-
+  const decodeAudioChunk = async (source: string | Uint8Array, audioCtx: AudioContext): Promise<AudioBuffer | null> => {
     try {
-      setIsPlayingAudio(index);
-      const audioCtx = audioCtxRef.current;
-      if (!audioCtx) return;
+      let bytes: Uint8Array;
+      if (typeof source === 'string') {
+        const binaryString = atob(source);
+        const len = binaryString.length;
+        bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+      } else {
+        bytes = source;
+      }
 
-      let binaryString;
+      const len = bytes.length;
+
+      // Try encoded decode first
       try {
-        binaryString = atob(base64Audio);
+        return await audioCtx.decodeAudioData(bytes.buffer.slice(0));
       } catch (e) {
-        console.error("Base64 decode error:", e);
-        throw new Error("Invalid audio data format received");
-      }
-      
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      let audioBuffer: AudioBuffer | null = null;
-      
-      // 1. Try to decode as encoded format (WAV/MP3)
-      try {
-        // Use a copy for decoding
-        const bufferCopy = bytes.buffer.slice(0);
-        audioBuffer = await audioCtx.decodeAudioData(bufferCopy);
-      } catch (decodeErr) {
-        // 2. Fallback: Assume raw 16-bit PCM 24kHz (Gemini standard)
-        console.log("Decoding failed, attempting raw PCM playback...");
+        // Fallback to raw PCM 16-bit 24kHz
         const pcmLen = len / 2;
-        audioBuffer = audioCtx.createBuffer(1, pcmLen, 24000);
+        const audioBuffer = audioCtx.createBuffer(1, pcmLen, 24000);
         const channelData = audioBuffer.getChannelData(0);
-        const dataView = new DataView(bytes.buffer);
+        const pcmData = new Int16Array(bytes.buffer);
         for (let i = 0; i < pcmLen; i++) {
-          const pcm = dataView.getInt16(i * 2, true);
-          channelData[i] = pcm / 32768; // Normalize to [-1, 1]
+          channelData[i] = pcmData[i] / 32768;
         }
+        return audioBuffer;
       }
+    } catch (err) {
+      console.error("Chunk decode error:", err);
+      return null;
+    }
+  };
 
-      if (!audioBuffer) throw new Error("Could not create audio buffer");
+  const playBufferChunk = (buffer: AudioBuffer, startTime: number, index: number) => {
+    const audioCtx = audioCtxRef.current;
+    if (!audioCtx) return;
 
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    
+    // Smooth transition
+    const actualStartTime = Math.max(startTime, audioCtx.currentTime);
+    source.start(actualStartTime);
+    
+    source.onended = () => {
+      // If this was the "current" source, we should check if more chunks are coming.
+      // But in streaming mode, we don't know easily when it ends until the generator finishes.
+    };
+  };
+
+  const playFromBase64 = async (base64: string, index: number) => {
+    const audioCtx = audioCtxRef.current;
+    if (!audioCtx) return;
+
+    setIsPlayingAudio(index);
+    const buffer = await decodeAudioChunk(base64, audioCtx);
+    if (buffer) {
       const source = audioCtx.createBufferSource();
-      source.buffer = audioBuffer;
+      source.buffer = buffer;
       source.connect(audioCtx.destination);
-      
       source.onended = () => {
-        if (currentSourceRef.current === source) {
-          setIsPlayingAudio(null);
-          currentSourceRef.current = null;
-        }
+        setIsPlayingAudio(null);
       };
-
       currentSourceRef.current = source;
       source.start();
-    } catch (err) {
-      console.error("Audio playback error:", err);
+    } else {
       setIsPlayingAudio(null);
     }
   };
@@ -216,6 +287,75 @@ export default function AIChat() {
     }
   };
 
+  const handleNexusStream = async (stream: AsyncGenerator<{ text: string | null; audio: string | null | undefined }>) => {
+    setIsLoading(true);
+    const botIdx = messages.length; // The index the new message will have
+    setMessages(prev => [...prev, { role: 'bot', content: '' }]);
+    
+    // Resume audio context
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    }
+    await audioCtxRef.current.resume();
+    const audioCtx = audioCtxRef.current;
+    
+    setIsPlayingAudio(botIdx);
+    let nextAudioTime = audioCtx.currentTime + 0.1;
+    let accumulatedText = '';
+    let allAudioChunks: Uint8Array[] = [];
+
+    try {
+      for await (const chunk of stream) {
+        if (chunk.text) {
+          accumulatedText += chunk.text;
+          setMessages(prev => {
+            const next = [...prev];
+            next[next.length - 1] = { ...next[next.length - 1], content: accumulatedText };
+            return next;
+          });
+        }
+        
+        if (chunk.audio) {
+          const binaryString = atob(chunk.audio);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+          allAudioChunks.push(bytes);
+          
+          const buffer = await decodeAudioChunk(chunk.audio, audioCtx);
+          if (buffer) {
+            playBufferChunk(buffer, nextAudioTime, botIdx);
+            nextAudioTime += buffer.duration;
+          }
+        }
+      }
+
+      // Cache the full audio once complete
+      if (allAudioChunks.length > 0) {
+        const totalLen = allAudioChunks.reduce((acc, curr) => acc + curr.length, 0);
+        const fullBytes = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const c of allAudioChunks) {
+          fullBytes.set(c, offset);
+          offset += c.length;
+        }
+        let binary = '';
+        for (let i = 0; i < fullBytes.length; i++) binary += String.fromCharCode(fullBytes[i]);
+        setAudioCache(prev => ({ ...prev, [botIdx]: btoa(binary) }));
+      }
+    } catch (err) {
+      console.error("Nexus Stream Error:", err);
+    } finally {
+      setIsLoading(false);
+      // Keep playing state until audio catch-up if needed, 
+      // but for UX, clearing it when stream ends is often okay if buffer is small.
+      setTimeout(() => {
+        if (audioCtx.currentTime >= nextAudioTime - 0.5) {
+          setIsPlayingAudio(null);
+        }
+      }, 1000);
+    }
+  };
+
   const handleVoiceSend = async (base64Audio: string, mimeType: string) => {
     const userMessage: Message = { role: 'user', content: "🎤 _Voice Input Received_" };
     setMessages(prev => [...prev, userMessage]);
@@ -226,8 +366,9 @@ export default function AIChat() {
       const botMessage: Message = { role: 'bot', content: botResponse };
       setMessages(prev => {
         const newMessages = [...prev, botMessage];
-        // Use the index of the last message (the bot's response)
-        playAudioResponse(botResponse, newMessages.length - 1);
+        // Use the index of the response to trigger audio
+        const botIdx = newMessages.length - 1;
+        playAudioResponse(botResponse, botIdx);
         return newMessages;
       });
     } catch (err) {
@@ -359,22 +500,13 @@ export default function AIChat() {
     const userMessage = input.trim();
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setIsLoading(true);
-
+    
     try {
-      const botResponse = await getFarmingAdvice(userMessage, settings.language);
-      const botMessage: Message = { role: 'bot', content: botResponse };
-      setMessages(prev => {
-        const newMessages = [...prev, botMessage];
-        // We don't auto-play for text input unless the user wants it,
-        // but we'll pre-fetch it (handled by the useEffect)
-        return newMessages;
-      });
+      const stream = getFarmingNexusStream(userMessage, settings.language);
+      await handleNexusStream(stream);
     } catch (err) {
       console.error("Chat Send Error:", err);
       setMessages(prev => [...prev, { role: 'bot', content: "Protocol error in agricultural gateway. Please refresh." }]);
-    } finally {
-      setIsLoading(false);
     }
   };
 

@@ -5,11 +5,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
+import { getTranslation } from '@/constants/translations';
 
 export default function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { isSidebarCollapsed, setIsSidebarCollapsed } = useApp();
+  const { isSidebarCollapsed, setIsSidebarCollapsed, settings } = useApp();
   const { user, signOut } = useAuth();
+  const t = getTranslation(settings.language);
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -19,12 +21,12 @@ export default function Sidebar() {
 
   const navItems = [
     { to: '/', icon: Home, label: 'Home' },
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/ai-chat', icon: MessageSquare, label: 'AI Advisor' },
-    { to: '/crops', icon: Sprout, label: 'Crops' },
-    { to: '/weather', icon: CloudSun, label: 'Weather' },
-    { to: '/diagnostic', icon: ShieldAlert, label: 'Diagnostics' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
+    { to: '/dashboard', icon: LayoutDashboard, label: t.dashboard },
+    { to: '/ai-chat', icon: MessageSquare, label: t.intelligence },
+    { to: '/crops', icon: Sprout, label: t.crops },
+    { to: '/weather', icon: CloudSun, label: t.weather },
+    { to: '/diagnostic', icon: ShieldAlert, label: t.diagnostic },
+    { to: '/settings', icon: Settings, label: t.settings },
   ];
 
   const userInitial = user?.email ? user.email[0].toUpperCase() : 'U';
@@ -133,7 +135,7 @@ export default function Sidebar() {
             )}
           >
             <LogOut className="w-5 h-5" />
-            {(!isSidebarCollapsed || isMobileOpen) && <span>Sign Out</span>}
+            {(!isSidebarCollapsed || isMobileOpen) && <span>{t.signOut}</span>}
           </button>
         </div>
       </motion.aside>

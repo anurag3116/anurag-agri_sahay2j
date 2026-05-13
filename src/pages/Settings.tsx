@@ -2,6 +2,7 @@ import { useApp } from '@/context/AppContext';
 import { Moon, Sun, Monitor, Bell, Globe, Shield, CreditCard, ChevronRight, Database, Save, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { getTranslation } from '@/constants/translations';
 
 export default function Settings() {
   const { settings, updateSettings } = useApp();
@@ -30,12 +31,14 @@ export default function Settings() {
     }
   };
 
+  const t = getTranslation(settings.language);
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6 mb-8">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">System Configuration</h1>
-          <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-[0.2em] mt-1">Version Control & Preference Management</p>
+          <h1 className="text-xl font-bold tracking-tight">{t.settingsHeader}</h1>
+          <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-[0.2em] mt-1">{t.settingsVersion}</p>
         </div>
       </div>
 
@@ -44,7 +47,7 @@ export default function Settings() {
         <section className="space-y-4">
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
             <Database className="w-4 h-4" />
-            Cloud Infrastructure (Supabase)
+            {t.cloudInfra}
           </h2>
           <div className="card p-6 bg-white border border-slate-200 shadow-sm space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -85,7 +88,7 @@ export default function Settings() {
         <section className="space-y-4">
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
             <Monitor className="w-4 h-4" />
-            Display Architecture
+            {t.displayArch}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <button 
@@ -96,7 +99,7 @@ export default function Settings() {
               )}
             >
               <Sun className="w-8 h-8 mx-auto mb-3 text-amber-500" />
-              <span className="text-xs font-bold uppercase tracking-widest">Luminous Interface</span>
+              <span className="text-xs font-bold uppercase tracking-widest">{t.appearanceLight}</span>
             </button>
             <button 
               onClick={() => updateSettings({ theme: 'dark' })}
@@ -106,11 +109,11 @@ export default function Settings() {
               )}
             >
               <Moon className="w-8 h-8 mx-auto mb-3 text-emerald-900" />
-              <span className="text-xs font-bold uppercase tracking-widest">Nocturnal Layer</span>
+              <span className="text-xs font-bold uppercase tracking-widest">{t.appearanceDark}</span>
             </button>
             <div className="p-6 rounded-xl border border-dotted border-slate-200 bg-slate-50/50 text-center opacity-50 flex flex-col items-center justify-center">
               <Monitor className="w-8 h-8 mx-auto mb-3 text-slate-400" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-tight">Adaptive Detection<br />(Restricted)</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 leading-tight">{t.appearanceAdaptive}<br />(Restricted)</span>
             </div>
           </div>
         </section>
@@ -119,13 +122,13 @@ export default function Settings() {
         <section className="space-y-4">
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500 flex items-center gap-2">
             <Globe className="w-4 h-4" />
-            Sector Parameters
+            {t.sectorParams}
           </h2>
           <div className="card divide-y divide-slate-100 p-0 overflow-hidden bg-white border border-slate-200">
             <div className="flex flex-col group hover:bg-slate-50/50 transition-colors border-b border-slate-100">
               <div className="flex items-center justify-between p-6">
                 <div className="flex-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Operational Geostation</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t.geoStation}</p>
                   {isEditingLocation ? (
                     <div className="flex gap-2 max-w-sm mt-2">
                       <input 
@@ -141,13 +144,13 @@ export default function Settings() {
                         disabled={isSavingLocation}
                         className="bg-emerald-900 text-white px-3 py-1.5 rounded-md text-[10px] font-bold uppercase disabled:opacity-50"
                       >
-                        {isSavingLocation ? <Loader2 className="w-3 h-3 animate-spin" /> : "Verify"}
+                        {isSavingLocation ? <Loader2 className="w-3 h-3 animate-spin" /> : t.verify}
                       </button>
                       <button 
                         onClick={() => { setIsEditingLocation(false); setNewLocation(settings.location); }}
                         className="bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase"
                       >
-                        Cancel
+                        {t.cancel}
                       </button>
                     </div>
                   ) : (
@@ -159,49 +162,63 @@ export default function Settings() {
                     onClick={() => setIsEditingLocation(true)}
                     className="text-emerald-700 font-bold text-[10px] uppercase tracking-widest hover:text-emerald-600 px-3 py-1 bg-emerald-50 rounded-md border border-emerald-100 transition-all"
                   >
-                    Modify
+                    {t.modify}
                   </button>
                 )}
               </div>
             </div>
             <SettingItem 
-              label="Telemetry Units" 
-              value={settings.unit === 'metric' ? "Standard (Celsius, kg)" : "Imperial (Fahrenheit, lb)"} 
+              label={t.telemetryUnits} 
+              value={settings.unit === 'metric' ? t.unitsMetric : t.unitsImperial} 
               onEdit={() => updateSettings({ unit: settings.unit === 'metric' ? 'imperial' : 'metric' })}
+              modifyLabel={t.modify}
             />
             <div className="flex flex-col group hover:bg-slate-50/50 transition-colors border-b border-slate-100">
               <div className="flex items-center justify-between p-6">
                 <div className="flex-1">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Uplink Language (System Voice)</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t.uplinkLang}</p>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {['English', 'Hindi', 'Hinglish', 'Punjabi', 'Haryanvi', 'Bhojpuri', 'Marathi', 'Bengali', 'Telugu'].map((lang) => (
+                    {[
+                      { id: 'English', name: 'English' },
+                      { id: 'Hindi', name: 'हिन्दी' },
+                      { id: 'Punjabi', name: 'ਪੰਜਾਬੀ' },
+                      { id: 'Haryanvi', name: 'हरियाणवी' },
+                      { id: 'Bhojpuri', name: 'भोजपुरी' },
+                      { id: 'Marathi', name: 'मराठी' },
+                      { id: 'Bengali', name: 'বাংলা' },
+                      { id: 'Telugu', name: 'తెలుగు' },
+                      { id: 'Gujarati', name: 'ગુજરાતી' },
+                      { id: 'Kannada', name: 'ಕನ್ನಡ' },
+                      { id: 'Tamil', name: 'தமிழ்' },
+                      { id: 'Malayalam', name: 'മലയാളം' }
+                    ].map((lang) => (
                       <button
-                        key={lang}
-                        onClick={() => updateSettings({ language: lang })}
+                        key={lang.id}
+                        onClick={() => updateSettings({ language: lang.id })}
                         className={cn(
-                          "px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-all",
-                          settings.language === lang 
+                          "px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-all",
+                          settings.language === lang.id 
                             ? "bg-emerald-900 text-white border-emerald-900 shadow-sm" 
                             : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300"
                         )}
                       >
-                        {lang}
+                        {lang.name}
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
             </div>
-            <SettingItem label="Temporal Offset" value="UTC +5:30 (IST)" />
+            <SettingItem label={t.temporalOffset} value="UTC +5:30 (IST)" />
           </div>
         </section>
 
         {/* More Options */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
-            { icon: Bell, title: "Alert Protocols", color: "blue", bg: "bg-blue-50", text: "text-blue-600" },
-            { icon: Shield, title: "Data Security", color: "emerald", bg: "bg-emerald-50", text: "text-emerald-700" },
-            { icon: CreditCard, title: "License Tier", color: "amber", bg: "bg-amber-50", text: "text-amber-600" }
+            { icon: Bell, title: t.alertProtocols, color: "blue", bg: "bg-blue-50", text: "text-blue-600" },
+            { icon: Shield, title: t.dataSecurity, color: "emerald", bg: "bg-emerald-50", text: "text-emerald-700" },
+            { icon: CreditCard, title: t.licenseTier, color: "amber", bg: "bg-amber-50", text: "text-amber-600" }
           ].map((item, i) => (
             <div key={i} className="card p-5 flex items-center justify-between cursor-pointer hover:border-emerald-200 transition-all bg-white border-slate-200 shadow-sm group">
               <div className="flex items-center gap-4">
@@ -223,7 +240,7 @@ export default function Settings() {
   );
 }
 
-function SettingItem({ label, value, onEdit }: any) {
+function SettingItem({ label, value, onEdit, modifyLabel }: any) {
   return (
     <div className="flex items-center justify-between p-6 group hover:bg-slate-50/50 transition-colors">
       <div>
@@ -235,7 +252,7 @@ function SettingItem({ label, value, onEdit }: any) {
           onClick={onEdit}
           className="text-emerald-700 font-bold text-[10px] uppercase tracking-widest hover:text-emerald-600 px-3 py-1 bg-emerald-50 rounded-md border border-emerald-100 transition-all"
         >
-          Modify
+          {modifyLabel || 'Modify'}
         </button>
       )}
     </div>

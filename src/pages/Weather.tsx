@@ -9,6 +9,7 @@ import {
 import { useApp } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
 import { getWeatherData, WeatherData } from '@/services/weather';
+import { getTranslation } from '@/constants/translations';
 
 const iconMap: Record<string, any> = {
   '01d': Sun,
@@ -33,6 +34,7 @@ const iconMap: Record<string, any> = {
 
 export default function Weather() {
   const { settings } = useApp();
+  const t = getTranslation(settings.language);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [detecting, setDetecting] = useState(false);
@@ -124,7 +126,7 @@ export default function Weather() {
     <div className="space-y-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Weather Intelligence</h1>
+          <h1 className="text-xl font-bold tracking-tight">{t.weatherIntel}</h1>
           <p className="text-[10px] text-emerald-800 font-bold uppercase tracking-[0.2em] mt-1">
             Satellite Link: {weather?.name || settings.location} active
           </p>
@@ -181,7 +183,7 @@ export default function Weather() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-bold uppercase tracking-wider">
-                      Feels like {Math.round(weather.current.feels_like)}°C
+                      {t.feelsLike} {Math.round(weather.current.feels_like)}°C
                     </p>
                     <p className="text-[10px] text-emerald-500 mt-1">Refreshed: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
@@ -190,14 +192,14 @@ export default function Weather() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <WeatherDetailCard icon={Wind} label="Wind Speed" value={`${weather.current.wind_speed} m/s`} desc="Average Velocity" />
-              <WeatherDetailCard icon={Droplets} label="Humidity Index" value={`${weather.current.humidity}%`} desc="Direct Readout" />
-              <WeatherDetailCard icon={Eye} label="Atmosphere" value={`${weather.current.visibility / 1000} km`} desc="Visual Range" />
-              <WeatherDetailCard icon={Calendar} label="Precipitation" value={`${Math.round(weather.forecast[0]?.pop * 100)}%`} desc="Immediate Probability" />
+              <WeatherDetailCard icon={Wind} label={t.windSpeed} value={`${weather.current.wind_speed} m/s`} desc="Average Velocity" />
+              <WeatherDetailCard icon={Droplets} label={t.humidityIndex} value={`${weather.current.humidity}%`} desc="Direct Readout" />
+              <WeatherDetailCard icon={Eye} label={t.visibility} value={`${weather.current.visibility / 1000} km`} desc="Visual Range" />
+              <WeatherDetailCard icon={Calendar} label={t.precipitation} value={`${Math.round(weather.forecast[0]?.pop * 100)}%`} desc="Immediate Probability" />
             </div>
 
             <div className="card">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-6">5-Day Atmospheric Forecast</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-6">{t.fiveDayForecast}</h3>
               <div className="flex overflow-x-auto gap-2 pb-4 no-scrollbar -mx-2 px-2 md:-mx-0 md:px-0 md:grid md:grid-cols-5 md:pb-0">
                 {dailyForecast.map((item, i) => {
                   const Icon = iconMap[item.icon] || Sun;
@@ -220,7 +222,7 @@ export default function Weather() {
               <div className="p-4 bg-slate-50 border-b border-slate-100">
                 <h3 className="text-xs font-bold font-sans flex items-center gap-2 uppercase tracking-widest text-emerald-900">
                   <Sprout className="w-3 h-3" />
-                  Agronomist View
+                  {t.agronomistView}
                 </h3>
               </div>
               <div className="p-5 space-y-5">
@@ -274,7 +276,7 @@ export default function Weather() {
               <div className="card bg-amber-50 border-amber-200 shadow-sm">
                 <h3 className="text-[10px] font-bold text-amber-800 uppercase tracking-widest flex items-center gap-2 mb-3">
                   <AlertCircle className="w-4 h-4" />
-                  Active Farming Alert
+                  {t.farmingAlert}
                 </h3>
                 <p className="text-xs text-amber-900 leading-relaxed font-medium">
                   {weather.current.temp > 30 
@@ -286,7 +288,7 @@ export default function Weather() {
               <div className="card bg-emerald-50 border-emerald-100 shadow-sm">
                 <h3 className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest flex items-center gap-2 mb-3">
                   <Sprout className="w-4 h-4" />
-                  Growth Conditions
+                  {t.growthConditions}
                 </h3>
                 <p className="text-xs text-emerald-900 leading-relaxed font-medium">
                   Ideal metabolic conditions active. Recommended period for structural reinforcement/fertilization.
@@ -295,18 +297,18 @@ export default function Weather() {
             )}
 
             <div className="card bg-white border border-slate-200 shadow-sm">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Celestial Alignment</h3>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">{t.celestialAlignment}</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
-                  <span className="text-slate-400">Sunrise</span>
+                  <span className="text-slate-400">{t.sunrise}</span>
                   <span className="text-slate-700">{formatTime(weather.current.sunrise)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
-                  <span className="text-slate-400">Sunset</span>
+                  <span className="text-slate-400">{t.sunset}</span>
                   <span className="text-slate-700">{formatTime(weather.current.sunset)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
-                  <span className="text-slate-400">Visibility</span>
+                  <span className="text-slate-400">{t.visibility}</span>
                   <span className="text-slate-700">{weather.current.visibility / 1000} KM</span>
                 </div>
               </div>
