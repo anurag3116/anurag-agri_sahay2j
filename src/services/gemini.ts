@@ -1,8 +1,22 @@
 import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+let groqClient: Groq | null = null;
+
+function getGroqClient(): Groq {
+  if (!groqClient) {
+    const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+    if (!apiKey) {
+      throw new Error("VITE_GROQ_API_KEY environment variable is missing or empty. Please provide it in the Secrets panel.");
+    }
+    groqClient = new Groq({ apiKey, dangerouslyAllowBrowser: true });
+  }
+  return groqClient;
+}
 
 const MODEL_NAME = "gemini-3-flash-preview";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 export async function getFarmingAdvice(message: string, language: string = 'English'): Promise<string> {
   const prompt = `You are an expert AI Farming Advisor. Answer the following user query with professional, actionable, and sustainable agricultural advice.
@@ -10,13 +24,13 @@ export async function getFarmingAdvice(message: string, language: string = 'Engl
   Query: ${message}`;
   
   try {
-    const result = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+    const chatCompletion = await getGroqClient().chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: GROQ_MODEL,
     });
-    return result.text || "I apologize, but I couldn't generate a response at this moment.";
+    return chatCompletion.choices[0]?.message?.content || "I apologize, but I couldn't generate a response at this moment.";
   } catch (err) {
-    console.error("Gemini Error:", err);
+    console.error("Groq Error:", err);
     return "The intelligence core is currently recalibrating. Please retry your query shortly.";
   }
 }
@@ -27,14 +41,17 @@ export async function* getFarmingNexusStream(message: string, language: string =
   Query: ${message}`;
   
   try {
-    const result = await ai.models.generateContentStream({
-      model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+    const stream = await getGroqClient().chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: GROQ_MODEL,
+      stream: true,
     });
 
-    for await (const chunk of result) {
-      const text = chunk.text;
-      yield { text, audio: null };
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content || '';
+      if (text) {
+        yield { text, audio: null };
+      }
     }
   } catch (err) {
     console.error("Nexus Stream Error:", err);
@@ -43,27 +60,47 @@ export async function* getFarmingNexusStream(message: string, language: string =
 }
 
 export async function getFarmingVoiceAdvice(base64Audio: string, mimeType: string, language: string = 'English'): Promise<string> {
-  const prompt = `Listen to this agricultural query. Detect the language spoken. 
-  If the detected language is one of the supported ones (Hindi, Haryanvi, Bhojpuri, Punjabi, English, Marathi, Bengali, Telugu, Gujarati, Kannada, Tamil, Malayalam, Odia, Assamese, Maithili, Dogri, Hinglish, etc.), respond in that SAME language. 
-  If you can't detect it clearly, default to ${language}.
-  You are an expert Krishi (Farming) Advisor. Provide professional, sustainable, and actionable advice. Respond strictly in the detected language.`;
-
   try {
-    const result = await ai.models.generateContent({
+    // 1. Transcribe using Groq Whisper (if possible via base64, otherwise we might need a blob/file)
+    // Groq's API typically expects a file. We can create a temporary file or use a Buffer.
+    // For browser/frontend, we can use a Blob converted to File.
+    
+    // However, to keep it simple and robust within this environment, 
+    // I'll first try to transcribe using the existing Gemini multimodal logic but just for transcription,
+    // then use Groq for the "brain".
+    
+    const transcriptionPrompt = "Transcribe the following audio query exactly. Detect the language.";
+    const transcriptionResult = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: [
         {
           role: 'user',
           parts: [
             { inlineData: { data: base64Audio, mimeType } },
-            { text: prompt }
+            { text: transcriptionPrompt }
           ]
         }
       ]
     });
-    return result.text || "Voice recognition complete, but no response generated.";
+    
+    const transcribedText = transcriptionResult.text || "";
+    if (!transcribedText) return "I couldn't hear your query clearly.";
+
+    // 2. Use Groq for the actual "Brain"
+    const brainPrompt = `You are an expert Krishi (Farming) Advisor. 
+    The user said: "${transcribedText}"
+    Detect the language of the query and respond strictly in that SAME language.
+    If you can't detect it clearly, default to ${language}.
+    Provide professional, sustainable, and actionable advice.`;
+
+    const chatCompletion = await getGroqClient().chat.completions.create({
+      messages: [{ role: 'user', content: brainPrompt }],
+      model: GROQ_MODEL,
+    });
+
+    return chatCompletion.choices[0]?.message?.content || "I couldn't process your request.";
   } catch (err) {
-    console.error("Gemini Voice Error:", err);
+    console.error("Groq Voice Brain Error:", err);
     return "Voice synthesis uplink error. Please try text input.";
   }
 }
@@ -152,11 +189,11 @@ export async function getSpecializedAdvice({ category, crop, location, weather, 
   const prompt = `${basePrompt} IMPORTANT: Respond strictly in the ${language} language.`;
   
   try {
-    const result = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+    const chatCompletion = await getGroqClient().chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: GROQ_MODEL,
     });
-    return result.text || "Report generation failed.";
+    return chatCompletion.choices[0]?.message?.content || "Report generation failed.";
   } catch (err) {
     return "Specialized report temporarily unavailable.";
   }
@@ -179,11 +216,11 @@ export async function getCropRecommendation(data: any, language: string = 'Engli
   IMPORTANT: Respond strictly in the ${language} language.`;
 
   try {
-    const result = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+    const chatCompletion = await getGroqClient().chat.completions.create({
+      messages: [{ role: 'user', content: prompt }],
+      model: GROQ_MODEL,
     });
-    return result.text || "No recommendations found for these specific soil parameters.";
+    return chatCompletion.choices[0]?.message?.content || "No recommendations found for these specific soil parameters.";
   } catch (err) {
     return "Simulation error. Please check your data inputs.";
   }
@@ -226,18 +263,29 @@ export async function analyzeCropDisease(base64Image: string, mimeType: string, 
   };
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: [{ parts: [imagePart, textPart] }],
-      config: {
-        responseMimeType: "application/json",
-      },
+    const chatCompletion = await getGroqClient().chat.completions.create({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ],
+      model: "llama-3.2-11b-vision-preview",
+      response_format: { type: "json_object" },
     });
 
-    const text = response.text || "";
+    const text = chatCompletion.choices[0]?.message?.content || "{}";
     return JSON.parse(text) as DiseaseAnalysis;
   } catch (error) {
-    console.error("Gemini Analysis Error:", error);
+    console.error("Groq Analysis Error:", error);
     throw new Error("Failed to analyze image. Please try again with a clearer photo.");
   }
 }
